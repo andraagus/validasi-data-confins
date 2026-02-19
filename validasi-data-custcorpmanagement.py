@@ -51,24 +51,24 @@ def get_cell_value(value):
 def run_validation():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
-    file_a = next((f for f in os.listdir(current_dir) if ('coraccount' in f.lower() or 'coreaccount' in f.lower()) and f.endswith('.txt')), None)
-    file_b = next((f for f in os.listdir(current_dir) if f.lower().startswith('custcorpmanagement_') and f.endswith('.txt')), None)
+    file_custcorporate = next((f for f in os.listdir(current_dir) if ('custcorporate' in f.lower() or 'custcorporate' in f.lower()) and f.endswith('.txt')), None)
+    file_custcorpmanagement = next((f for f in os.listdir(current_dir) if f.lower().startswith('custcorpmanagement_') and f.endswith('.txt')), None)
 
-    if not file_a or not file_b:
+    if not file_custcorporate or not file_custcorpmanagement:
         print("Error: File .txt tidak ditemukan di folder.")
         return
 
     print(f"Membaca data...")
-    df_a = pd.read_csv(os.path.join(current_dir, file_a), sep='|', dtype=str)
-    df_b = pd.read_csv(os.path.join(current_dir, file_b), sep='|', dtype=str)
+    df_custcorporate = pd.read_csv(os.path.join(current_dir, file_custcorporate), sep='|', dtype=str)
+    df_custcorpmanagement = pd.read_csv(os.path.join(current_dir, file_custcorpmanagement), sep='|', dtype=str)
 
     # Step 3: Kelengkapan (Filter B yang ada di A)
-    df_b1 = df_b[df_b['CUST_NO'].isin(df_a['CUST_NO'])].copy()
+    df_b1 = df_custcorpmanagement[df_custcorpmanagement['CUST_NO'].isin(df_custcorporate['CUST_NO'])].copy()
     
     # Gabungkan dengan info Partner dari File A
     df_merged = pd.merge(
         df_b1, 
-        df_a[['CUST_NO', 'PARTNER_NAME', 'PARTNER_AGRMNT_NO', 'AGRMNT_NO']].drop_duplicates('CUST_NO'), 
+        df_custcorporate[['CUST_NO', 'PARTNER_NAME', 'PARTNER_AGRMNT_NO', 'AGRMNT_NO']].drop_duplicates('CUST_NO'), 
         on='CUST_NO', 
         how='left'
     )

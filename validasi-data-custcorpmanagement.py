@@ -2,6 +2,8 @@ import pandas as pd
 import os
 import re
 
+from requests import get
+
 # ==========================================
 # STEP 1: FUNGSI VALIDASI MODULAR (UNIT)
 # ==========================================
@@ -31,6 +33,17 @@ def validate_is_exactly_5_digits(value):
 
 def validate_is_exactly_16_digits(value): 
     return len(str(value).strip()) == 16 and str(value).strip().isdigit()
+
+def validate_sex(value):
+    return str(value).strip().upper() in ['F', 'M']
+
+def validate_shareholder_type(value):
+    return str(value).strip().upper() in ['P', 'C']
+
+def get_cell_value(value):
+    if pd.isna(value):
+        return None
+    return value
 # ==========================================
 # STEP 2, 3, & 4: PROSES DAN PENYIMPANAN
 # ==========================================
@@ -95,12 +108,12 @@ def run_validation():
     print("Sedang melakukan validasi per baris...")
     for _, row in df_merged.iterrows():
         # validasi share holder type
-        val_shareholder_type = str(row['SHAREHOLDER_TYPE']).strip()
-        if validate_not_blank(val_shareholder_type):
-            add_to_error('INVALID_SHAREHOLDER_TYPE', row, 'SHAREHOLDER_TYPE', "Tidak terdiri dari 2 digit")
+        val_shareholder_type = str(get_cell_value(row['SHAREHOLDER_TYPE']) or "").strip()
+        if validate_not_blank(val_shareholder_type) and not validate_shareholder_type(val_shareholder_type):
+            add_to_error('INVALID_SHAREHOLDER_TYPE', row, 'SHAREHOLDER_TYPE', "Tidak terdiri dari P / C digit")
         # validasi sex  
         val_sex = str(row['SEX']).strip()
-        if validate_not_blank(val_sex):
+        if validate_not_blank(val_sex) and not validate_sex(val_sex):
             add_to_error('INVALID_SEX', row, 'SEX', "Tidak terdiri dari F / M digit")
         # validasi alamat manajemen
         val_mngmnt_addr = str(row['MNGMNT_ADDR']).strip()

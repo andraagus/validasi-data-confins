@@ -52,7 +52,7 @@ def run_validation():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
     file_a = next((f for f in os.listdir(current_dir) if ('coraccount' in f.lower() or 'coreaccount' in f.lower()) and f.endswith('.txt')), None)
-    file_b = next((f for f in os.listdir(current_dir) if f.lower().startswith('customerpersonal_') and f.endswith('.txt')), None)
+    file_b = next((f for f in os.listdir(current_dir) if f.lower().startswith('custcorpmanagement_') and f.endswith('.txt')), None)
 
     if not file_a or not file_b:
         print("Error: File .txt tidak ditemukan di folder.")

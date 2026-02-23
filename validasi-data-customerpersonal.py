@@ -31,6 +31,51 @@ def validate_is_exactly_5_digits(value):
 
 def validate_is_exactly_16_digits(value): 
     return len(str(value).strip()) == 16 and str(value).strip().isdigit()
+
+def validate_relasi_IDNO_BIRTHDATE(id_no, birth_date, gender):
+    """
+    Validasi relasi antara ID_NO (NIK) dan BIRTH_DATE.
+    Format BIRTH_DATE yang diharapkan: DD-MM-YYYY
+    """
+    id_no = str(id_no).strip()
+    birth_date = str(birth_date).strip()
+    gender = str(gender).strip().upper()
+
+    # Pastikan panjang ID_NO cukup (minimal 12 digit untuk pengecekan ini)
+    if len(id_no) < 12 or len(birth_date) < 10:
+        return False
+
+    # Ambil komponen dari ID_NO (Index Python mulai dari 0)
+    # Digit 7-8: Tanggal, 9-10: Bulan, 11-12: Tahun (YY)
+    id_dd = id_no[6:8]
+    id_mm = id_no[8:10]
+    id_yy = id_no[10:12]
+
+    # Ambil komponen dari BIRTH_DATE (DD-MM-YYYY)
+    b_dd = birth_date[0:2]
+    b_mm = birth_date[3:5]
+    b_yy = birth_date[8:10] # Ambil 2 digit terakhir tahun
+
+    try:
+        if gender == 'M':
+            # Pria: ID_DD harus sama dengan B_DD
+            return id_dd == b_dd and id_mm == b_mm and id_yy == b_yy
+        
+        elif gender == 'F':
+            # Wanita: (ID_DD - 40) harus sama dengan B_DD
+            # Contoh: Lahir tanggal 01, maka di ID_NO tertulis 41
+            calc_dd = int(id_dd) - 40
+            # Kembalikan ke string dengan leading zero jika < 10 (misal '01')
+            str_calc_dd = str(calc_dd).zfill(2)
+            
+            return str_calc_dd == b_dd and id_mm == b_mm and id_yy == b_yy
+        
+        else:
+            return False # Gender tidak valid
+            
+    except ValueError:
+        return False # Jika ID_NO digit 7-8 bukan angka
+
 # ==========================================
 # STEP 2, 3, & 4: PROSES DAN PENYIMPANAN
 # ==========================================
@@ -38,7 +83,7 @@ def validate_is_exactly_16_digits(value):
 def run_validation():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
-    file_a = next((f for f in os.listdir(current_dir) if ('coraccount' in f.lower() or 'coreaccount' in f.lower()) and f.endswith('.txt')), None)
+    file_coreaccount = next((f for f in os.listdir(current_dir) if ('coraccount' in f.lower() or 'coreaccount' in f.lower()) and f.endswith('.txt')), None)
     file_b = next((f for f in os.listdir(current_dir) if f.lower().startswith('customerpersonal_') and f.endswith('.txt')), None)
 
     if not file_a or not file_b:
@@ -135,6 +180,7 @@ def run_validation():
         val_id = str(row['ID_NO'])
         if not validate_not_blank(val_id) or not validate_is_numeric(val_id) or not validate_is_exactly_16_digits(val_id):
             add_to_error('INVALID_ID_NO', row, 'ID_NO', "Bukan angka atau tidak 16 digit")
+            add_to_error(validate_not_two_digits(df))
 
          # 11. Validasi Nama ibu kandung
         val_mother = str(row['MOTHER_MAIDEN_NAME'])

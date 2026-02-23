@@ -84,15 +84,15 @@ def run_validation():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
     file_coreaccount = next((f for f in os.listdir(current_dir) if ('coraccount' in f.lower() or 'coreaccount' in f.lower()) and f.endswith('.txt')), None)
-    file_b = next((f for f in os.listdir(current_dir) if f.lower().startswith('customerpersonal_') and f.endswith('.txt')), None)
+    file_customerpersonal = next((f for f in os.listdir(current_dir) if f.lower().startswith('customerpersonal_') and f.endswith('.txt')), None)
 
-    if not file_a or not file_b:
+    if not file_coreaccount or not file_customerpersonal:
         print("Error: File .txt tidak ditemukan di folder.")
         return
 
     print(f"Membaca data...")
-    df_a = pd.read_csv(os.path.join(current_dir, file_a), sep='|', dtype=str)
-    df_b = pd.read_csv(os.path.join(current_dir, file_b), sep='|', dtype=str)
+    df_a = pd.read_csv(os.path.join(current_dir, file_coreaccount), sep='|', dtype=str)
+    df_b = pd.read_csv(os.path.join(current_dir, file_customerpersonal), sep='|', dtype=str)
 
     # Step 3: Kelengkapan (Filter B yang ada di A)
     df_b1 = df_b[df_b['CUST_NO'].isin(df_a['CUST_NO'])].copy()
@@ -180,7 +180,8 @@ def run_validation():
         val_id = str(row['ID_NO'])
         if not validate_not_blank(val_id) or not validate_is_numeric(val_id) or not validate_is_exactly_16_digits(val_id):
             add_to_error('INVALID_ID_NO', row, 'ID_NO', "Bukan angka atau tidak 16 digit")
-            add_to_error(validate_not_two_digits(df))
+            add_to_error(validate_relasi_IDNO_BIRTHDATE(val_id, row['BIRTH_DT'], row['MR_GENDER']), row, 'ID_NO', "Relasi ID_NO dengan BIRTH_DT dan GENDER tidak valid")
+
 
          # 11. Validasi Nama ibu kandung
         val_mother = str(row['MOTHER_MAIDEN_NAME'])

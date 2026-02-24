@@ -2,201 +2,200 @@ import pandas as pd
 import os
 import re
 
-from requests import get
-
 # ==========================================
-# STEP 1: FUNGSI VALIDASI MODULAR (UNIT)
+# STEP 1: FUNGSI VALIDASI MODULAR
 # ==========================================
 
 def validate_not_blank(value):
     val_str = str(value).strip()
-    return val_str != "" and val_str.lower() != 'nan'
+    return val_str != "" and val_str.lower() not in ['nan', 'none']
 
 def validate_is_numeric(value):
     return str(value).strip().isdigit()
 
-def validate_not_only_numeric(value):
-    return not str(value).strip().isdigit()
+def validate_is_decimal(value):
+    try:
+        clean_value = str(value).strip().replace(',', '')
+        float(clean_value)
+        return True
+    except ValueError:
+        return False
 
-def validate_not_two_digits(value):
-    return len(str(value).strip()) != 2
+def validate_date_format(value):
+    val = str(value).strip()
+    if len(val) == 10 and val[2] == '-' and val[5] == '-':
+        parts = val.split('-')
+        return all(p.isdigit() for p in parts)
+    return False
 
 def validate_no_special_chars(value):
     pattern = r"[!@#$%^&*()+?/><}{\[\]\-_=]"
     return not bool(re.search(pattern, str(value).strip()))
 
-def validate_is_exactly_4_digits(value):
-    return len(str(value).strip()) == 4 and str(value).strip().isdigit()
-
-def validate_is_exactly_5_digits(value):
-    return len(str(value).strip()) == 5 and str(value).strip().isdigit()
-
-def validate_is_exactly_16_digits(value): 
-    return len(str(value).strip()) == 16 and str(value).strip().isdigit()
-
-def validate_sex(value):
-    return str(value).strip().upper() in ['F', 'M']
-
-def validate_shareholder_type(value):
-    return str(value).strip().upper() in ['P', 'C']
-
 def get_cell_value(value):
-    if pd.isna(value):
-        return None
-    return value
+    if pd.isna(value) or str(value).lower() == 'nan':
+        return ""
+    return str(value).strip()
+
+def validate_relasi_IDNO_BIRTHDATE(id_no, birth_date, gender):
+    id_no = str(id_no).strip()
+    birth_date = str(birth_date).strip()
+    gender = str(gender).strip().upper()
+    if len(id_no) < 12 or len(birth_date) < 10: return False
+    try:
+        id_dd, id_mm, id_yy = id_no[6:8], id_no[8:10], id_no[10:12]
+        b_dd, b_mm, b_yy = birth_date[0:2], birth_date[3:5], birth_date[8:10]
+        if gender == 'M':
+            return id_dd == b_dd and id_mm == b_mm and id_yy == b_yy
+        elif gender == 'F':
+            calc_dd = int(id_dd) - 40
+            return str(calc_dd).zfill(2) == b_dd and id_mm == b_mm and id_yy == b_yy
+        return False
+    except: return False
+
 # ==========================================
-# STEP 2, 3, & 4: PROSES DAN PENYIMPANAN
+# STEP 2: PROSES VALIDASI PER SHEET PER KOLOM
 # ==========================================
 
 def run_validation():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
-    file_custcorporate = next((f for f in os.listdir(current_dir) if ('custcorporate' in f.lower() or 'custcorporate' in f.lower()) and f.endswith('.txt')), None)
-    file_custcorpmanagement = next((f for f in os.listdir(current_dir) if f.lower().startswith('custcorpmanagement_') and f.endswith('.txt')), None)
+    f_corp = next((f for f in os.listdir(current_dir) if 'custcorporate' in f.lower() and f.endswith('.txt')), None)
+    f_mngt = next((f for f in os.listdir(current_dir) if f.lower().startswith('custcorpmanagement_') and f.endswith('.txt')), None)
+    f_acc = next((f for f in os.listdir(current_dir) if 'account' in f.lower() and f.endswith('.txt')), None)
 
-    if not file_custcorporate or not file_custcorpmanagement:
-        print("Error: File .txt tidak ditemukan di folder.")
+    if not f_corp or not f_mngt:
+        print("Error: File .txt tidak lengkap.")
         return
 
-    print(f"Membaca data...")
-    df_custcorporate = pd.read_csv(os.path.join(current_dir, file_custcorporate), sep='|', dtype=str)
-    df_custcorpmanagement = pd.read_csv(os.path.join(current_dir, file_custcorpmanagement), sep='|', dtype=str)
+    df_a = pd.read_csv(os.path.join(current_dir, f_corp), sep='|', dtype=str)
+    df_b = pd.read_csv(os.path.join(current_dir, f_mngt), sep='|', dtype=str)
+    df_c = pd.read_csv(os.path.join(current_dir, f_acc), sep='|', dtype=str) if f_acc else pd.DataFrame()
 
-    # Step 3: Kelengkapan (Filter B yang ada di A)
-    df_b1 = df_custcorpmanagement[df_custcorpmanagement['CUST_NO'].isin(df_custcorporate['CUST_NO'])].copy()
-    
-    # Gabungkan dengan info Partner dari File A
-    df_merged = pd.merge(
-        df_b1, 
-        df_custcorporate[['CUST_NO', 'PARTNER_NAME', 'PARTNER_AGRMNT_NO', 'AGRMNT_NO']].drop_duplicates('CUST_NO'), 
-        on='CUST_NO', 
-        how='left'
-    )
+    df_merged = pd.merge(df_b, df_a[['CUST_NO', 'CUST_NAME']].drop_duplicates('CUST_NO'), on='CUST_NO', how='left')
+    if not df_c.empty:
+        df_merged = pd.merge(df_merged, df_c[['CUST_NO', 'PARTNER_NAME', 'AGRMNT_NO']].drop_duplicates('CUST_NO'), on='CUST_NO', how='left')
 
-    # Dictionary untuk menampung data per sheet
+    # Inisialisasi Dictionary untuk Sheet yang sangat spesifik
     sheets_data = {
-        'INVALID_NPWP': [],
-        'INVALID_SHAREHOLDER_TYPE': [],
-        'INVALID_SEX': [],
-        'INVALID_MNGMNT_ADDR': [],
-        'INVALID_MNGMNT_RT': [],
-        'INVALID_MNGMNT_RW': [],
-        'INVALID_MNGMNT_KEL': [],
-        'INVALID_MNGMNT_KEC': [],
-        'INVALID_MNGMNT_CITY': [],
-        'INVALID_MNGMNT_ZIPCODE': [],
-        'INVALID_MNGMNT_ID_TYPE': [],
-        'INVALID_MNGMNT_ID_NO': [],
-        'INVALID_MNGMNT_BIRTH_DT': [],
-        'INVALID_MNGMNT_BIRTH_PLACE': [],
-        'INVALID_SHARE_PORTION': [],
-        'INVALID_JABATAN': [],
-        'INVALID_PROVINSI': [],
+        'ERR_CUST_NOT_FOUND': [],
+        'ERR_SHAREHOLDER_TYPE': [],
+        'ERR_SEX': [],
+        'ERR_MNGMNT_ADDR': [],
+        'ERR_MNGMNT_RT': [],
+        'ERR_MNGMNT_RW': [],
+        'ERR_MNGMNT_KEL': [],
+        'ERR_MNGMNT_KEC': [],
+        'ERR_MNGMNT_CITY': [],
+        'ERR_MNGMNT_ZIPCODE': [],
+        'ERR_MNGMNT_ID_NO': [],
+        'ERR_MNGMNT_BIRTH_DATE': [],
+        'ERR_MNGMNT_BIRTH_PLACE': [],
+        'ERR_NPWP': [],
+        'ERR_SHARE_PORTION': [],
+        'ERR_JABATAN': [],
+        'ERR_PROVINSI': [],
+        'ERR_ESTABLISHMENT_YEAR': []
     }
 
-    def add_to_error(sheet_name, row, col_name, message):
-        sheets_data[sheet_name].append({
-            'PARTNER_NAME': row.get('PARTNER_NAME'),
-            'PARTNER_AGRMNT_NO': row.get('PARTNER_AGRMNT_NO'),
-            'AGRMNT_NO': row.get('AGRMNT_NO'),
-            'CUST_NO': row['CUST_NO'],
-            'CUST_NAME': row['CUST_NAME'],
-            'DATA_ORIGINAL': row.get(col_name), # Mengambil data asli yang salah
-            'KETERANGAN_ERROR': message
+    def add_to_error(sheet, row, col, msg):
+        sheets_data[sheet].append({
+            'CUST_NO': row.get('CUST_NO'),
+            'CUST_NAME': row.get('CUST_NAME', 'TIDAK DITEMUKAN'),
+            'PARTNER_NAME': row.get('PARTNER_NAME', 'N/A'),
+            'AGRMNT_NO': row.get('AGRMNT_NO', 'N/A'),
+            'DATA_ORIGINAL': row.get(col),
+            'KETERANGAN': msg
         })
 
-    print("Sedang melakukan validasi per baris...")
-    for _, row in df_merged.iterrows():
-        # validasi share holder type
-        val_shareholder_type = str(get_cell_value(row['SHAREHOLDER_TYPE']) or "").strip()
-        if validate_not_blank(val_shareholder_type) and not validate_shareholder_type(val_shareholder_type):
-            add_to_error('INVALID_SHAREHOLDER_TYPE', row, 'SHAREHOLDER_TYPE', "Tidak terdiri dari P / C digit")
-        # validasi sex  
-        val_sex = str(row['SEX']).strip()
-        if validate_not_blank(val_sex) and not validate_sex(val_sex):
-            add_to_error('INVALID_SEX', row, 'SEX', "Tidak terdiri dari F / M digit")
-        # validasi alamat manajemen
-        val_mngmnt_addr = str(row['MNGMNT_ADDR']).strip()
-        if validate_not_blank(val_mngmnt_addr) and not validate_no_special_chars(val_mngmnt_addr):
-            add_to_error('INVALID_MNGMNT_ADDR', row, 'MNGMNT_ADDR', "Ada karakter khusus")
-        # validasi rt
-        val_mngmnt_rt = str(row['MNGMNT_RT']).strip()
-        if validate_not_blank(val_mngmnt_rt) and not validate_is_numeric(val_mngmnt_rt):
-            add_to_error('INVALID_MNGMNT_RT', row, 'MNGMNT_RT', "Tidak terdiri dari 3 digit angka")
-        # validasi rw
-        val_mngmnt_rw = str(row['MNGMNT_RW']).strip()
-        if validate_not_blank(val_mngmnt_rw) and not validate_is_numeric(val_mngmnt_rw):
-            add_to_error('INVALID_MNGMNT_RW', row, 'MNGMNT_RW', "Tidak terdiri dari 3 digit angka")
-        # validasi kelurahan
-        val_mngmnt_kel = str(row['MNGMNT_KEL']).strip()
-        if validate_not_blank(val_mngmnt_kel) and not validate_no_special_chars(val_mngmnt_kel):
-            add_to_error('INVALID_MNGMNT_KEL', row, 'MNGMNT_KEL', "Ada karakter khusus")
-        # validasi kecamatan
-        val_mngmnt_kec = str(row['MNGMNT_KEC']).strip()
-        if validate_not_blank(val_mngmnt_kec) and not validate_no_special_chars(val_mngmnt_kec):
-            add_to_error('INVALID_MNGMNT_KEC', row, 'MNGMNT_KEC', "Ada karakter khusus")
-        # validasi kota
-        val_mngmnt_city = str(row['MNGMNT_CITY']).strip()
-        if validate_not_blank(val_mngmnt_city) and not validate_no_special_chars(val_mngmnt_city):
-            add_to_error('INVALID_MNGMNT_CITY', row, 'MNGMNT_CITY', "Ada karakter khusus")
-        # validasi kode pos
-        val_mngmnt_zipcode = str(row['MNGMNT_ZIPCODE']).strip()
-        if validate_not_blank(val_mngmnt_zipcode) and not validate_is_exactly_5_digits(val_mngmnt_zipcode):
-            add_to_error('INVALID_MNGMNT_ZIPCODE', row, 'MNGMNT_ZIPCODE', "Tidak terdiri dari 5 digit angka")
-        # validasi jenis id manajemen
-        val_mngmnt_id_type = str(row['MNGMNT_ID_TYPE']).strip()
-        if validate_not_blank(val_mngmnt_id_type) and validate_not_two_digits(val_mngmnt_id_type):
-            add_to_error('INVALID_MNGMNT_ID_TYPE', row, 'MNGMNT_ID_TYPE', "Tidak terdiri dari 2 digit")
-        # validasi no id manajemen
-        val_mngmnt_id_no = str(row['MNGMNT_ID_NO']).strip()
-        if validate_not_blank(val_mngmnt_id_no) and not validate_no_special_chars(val_mngmnt_id_no):
-            add_to_error('INVALID_MNGMNT_ID_NO', row, 'MNGMNT_ID_NO', "Ada karakter khusus")
-        # validasi tempat lahir
-        val_mngmnt_birth_place = str(row['MNGMNT_BIRTH_PLACE']).strip()
-        if validate_not_blank(val_mngmnt_birth_place) and not validate_no_special_chars(val_mngmnt_birth_place):
-            add_to_error('INVALID_MNGMNT_BIRTH_PLACE', row, 'MNGMNT_BIRTH_PLACE', "Ada karakter khusus")
-        # validasi tanggal lahir        
-        val_mngmnt_birth_date = str(row['MNGMNT_BIRTH_DATE']).strip()    
-        if validate_not_blank(val_mngmnt_birth_date):   
-            add_to_error('INVALID_MNGMNT_BIRTH_DT', row, 'MNGMNT_BIRTH_DATE', "Format tanggal tidak valid (DD-MM-YYYY)")        
-        # tahun pendirian
-        val_est_year = str(row['ESTABLISHMENT_YEAR']).strip() 
-        if validate_not_blank(val_est_year) and not validate_is_numeric(val_est_year):
-            add_to_error('INVALID_ESTABLISHMENT_YEAR', row, 'ESTABLISHMENT_YEAR', "Tidak terdiri dari 2 digit") 
-        #validasi npwp
-        val_npwp = str(row['NPWP']).strip() 
-        if validate_not_blank(val_npwp):
-            add_to_error('INVALID_NPWP', row, 'NPWP', "Tidak terdiri dari 16 digit angka")  
-        #validasi sahare portion
-        val_share_portion = str(row['SHARE_PORTION']).strip()    
-        if validate_not_blank(val_share_portion) and not validate_is_numeric(val_share_portion):   
-            add_to_error('INVALID_SHARE_PORTION', row, 'SHARE_PORTION', "Tidak terdiri dari 2 digit angka")
-        #validasi jabatan
-        val_jabatan = str(row['JABATAN']).strip()    
-        if validate_not_blank(val_jabatan) and not validate_is_numeric(val_jabatan):   
-            add_to_error('INVALID_JABATAN', row, 'JABATAN', "Tidak terdiri dari 2 digit angka") 
-        #validasi provinsi
-        val_provinsi = str(row['PROVINSI']).strip()    
-        if validate_not_blank(val_provinsi) and not validate_is_numeric(val_provinsi):  
-            add_to_error('INVALID_PROVINSI', row, 'PROVINSI', "Tidak terdiri dari 2 digit angka")                       
-        
+    print("Memulai validasi...")
 
-    # Simpan ke satu file Excel dengan banyak sheet
-    output_path = os.path.join(current_dir, 'DATA_CUSTOMERPERSONAL_TIDAK_VALID.xlsx')
-    
-    # Gunakan writer untuk membuat file dengan banyak sheet
-    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-        found_any_error = False
-        for sheet_name, data in sheets_data.items():
-            if data:
-                df_error = pd.DataFrame(data)
-                df_error.to_excel(writer, sheet_name=sheet_name, index=False)
-                found_any_error = True
-        
-    if found_any_error:
-        print(f"Selesai! File detail error tersimpan di: {output_path}")
+    for _, row in df_merged.iterrows():
+        # 0. Master Corporate Check
+        if pd.isna(row['CUST_NAME']):
+            add_to_error('ERR_CUST_NOT_FOUND', row, 'CUST_NO', "CUST_NO tidak ada di master corporate")
+
+        # 1. Shareholder Type (P/C)
+        val = get_cell_value(row.get('SHAREHOLDER_TYPE'))
+        if validate_not_blank(val) and val.upper() not in ['P', 'C']:
+            add_to_error('ERR_SHAREHOLDER_TYPE', row, 'SHAREHOLDER_TYPE', "Wajib P atau C")
+
+        # 2. Sex (F/M)
+        val = get_cell_value(row.get('SEX'))
+        if validate_not_blank(val) and val.upper() not in ['F', 'M']:
+            add_to_error('ERR_SEX', row, 'SEX', "Wajib F atau M")
+
+        # 3. Alamat & Karakter Khusus (Satu sheet per kolom)
+        for col, sheet in [('MNGMNT_ADDR', 'ERR_MNGMNT_ADDR'), ('MNGMNT_KEL', 'ERR_MNGMNT_KEL'), 
+                           ('MNGMNT_KEC', 'ERR_MNGMNT_KEC'), ('MNGMNT_CITY', 'ERR_MNGMNT_CITY'),
+                           ('MNGMNT_BIRTH_PLACE', 'ERR_MNGMNT_BIRTH_PLACE')]:
+            val = get_cell_value(row.get(col))
+            if validate_not_blank(val) and not validate_no_special_chars(val):
+                add_to_error(sheet, row, col, "Terdapat karakter khusus")
+
+        # 4. RT & RW
+        for col, sheet in [('MNGMNT_RT', 'ERR_MNGMNT_RT'), ('MNGMNT_RW', 'ERR_MNGMNT_RW')]:
+            val = get_cell_value(row.get(col))
+            if validate_not_blank(val) and (not val.isdigit() or len(val) > 3):
+                add_to_error(sheet, row, col, "Harus angka & maks 3 digit")
+
+        # 5. Zipcode
+        val = get_cell_value(row.get('MNGMNT_ZIPCODE'))
+        if validate_not_blank(val) and (not val.isdigit() or len(val) != 5):
+            add_to_error('ERR_MNGMNT_ZIPCODE', row, 'MNGMNT_ZIPCODE', "Harus 5 digit angka")
+
+        # 6. ID No (Relasi NIK)
+        id_no = get_cell_value(row.get('ID_NO'))
+        id_type = get_cell_value(row.get('ID_TYPE')).upper()
+        b_date = get_cell_value(row.get('BIRTH_DT'))
+        sex = get_cell_value(row.get('SEX'))
+        if validate_not_blank(id_no):
+            if not validate_no_special_chars(id_no):
+                add_to_error('ERR_MNGMNT_ID_NO', row, 'ID_NO', "Ada karakter khusus")
+            elif len(id_no) == 16 and id_type in ['NIK', 'KTP', 'ID NO']:
+                if not validate_relasi_IDNO_BIRTHDATE(id_no, b_date, sex):
+                    add_to_error('ERR_MNGMNT_ID_NO', row, 'ID_NO', f"NIK tidak sinkron dengan Birth Date ({b_date})")
+
+        # 7. Birth Date
+        if validate_not_blank(b_date) and not validate_date_format(b_date):
+            add_to_error('ERR_MNGMNT_BIRTH_DATE', row, 'BIRTH_DT', "Format wajib DD-MM-YYYY")
+
+        # 7.b. Birth Place (Karakter Khusus)
+        val = get_cell_value(row.get('BIRTH_PLACE'))
+        if validate_not_blank(val) and not validate_no_special_chars(val):
+            add_to_error('ERR_MNGMNT_BIRTH_PLACE', row, 'BIRTH_PLACE', "Terdapat karakter khusus")
+
+        # 8. NPWP
+        val = get_cell_value(row.get('NPWP_NO'))
+        if validate_not_blank(val) and (not val.isdigit() or len(val) != 16):
+            add_to_error('ERR_NPWP', row, 'NPWP_NO', "Wajib 16 digit angka")
+
+        # 9. Share Portion
+        val = get_cell_value(row.get('SHARE_PORTION'))
+        if validate_not_blank(val) and not validate_is_decimal(val):
+            add_to_error('ERR_SHARE_PORTION', row, 'SHARE_PORTION', "Harus format angka/desimal")
+
+        # 10. Jabatan, Provinsi, Est Year
+        for col, sheet in [('JABATAN', 'ERR_JABATAN'), ('PROVINSI', 'ERR_PROVINSI')]:
+            val = get_cell_value(row.get(col))
+            if validate_not_blank(val) and not val.isdigit():
+                add_to_error(sheet, row, col, "Harus kode angka")
+
+        val = get_cell_value(row.get('ESTABLISHMENT_YEAR'))
+        if validate_not_blank(val) and (not val.isdigit() or len(val) != 4):
+            add_to_error('ERR_ESTABLISHMENT_YEAR', row, 'ESTABLISHMENT_YEAR', "Harus 4 digit tahun")
+
+    # --- SIMPAN KE EXCEL ---
+    output_path = os.path.join(current_dir, 'DETAIL_ERROR_PER_KOLOM.xlsx')
+    valid_sheets = {name: data for name, data in sheets_data.items() if data}
+
+    if valid_sheets:
+        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+            for name, data in valid_sheets.items():
+                pd.DataFrame(data).to_excel(writer, sheet_name=name, index=False)
+        print(f"Selesai! File detail error per sheet: {output_path}")
     else:
-        print("Luar biasa! Tidak ditemukan data yang tidak valid.")
+        print("Data Management Bersih!")
 
 if __name__ == "__main__":
     run_validation()

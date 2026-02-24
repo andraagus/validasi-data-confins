@@ -11,7 +11,28 @@ def validate_not_blank(value):
     return val_str != "" and val_str.lower() != 'nan'
 
 def validate_is_numeric(value):
-    return str(value).strip().isdigit()
+    try:
+        # 1. Ubah ke string dan hapus spasi di ujung
+        clean_value = str(value).strip()
+        
+        # 2. Hapus pemisah ribuan (titik dan koma) 
+        # Kita asumsikan titik/koma di tengah adalah pemisah ribuan jika setelahnya masih ada titik desimal
+        # Cara termudah: Hapus semua koma dan titik, KECUALI titik terakhir sebagai desimal
+        
+        if clean_value.count('.') > 1 or (',' in clean_value):
+            # Jika ada lebih dari satu titik atau ada koma, hapus semua kecuali titik terakhir
+            parts = clean_value.split('.')
+            # Gabungkan semua bagian kecuali yang terakhir dengan kosong, lalu sambung dengan bagian terakhir
+            if len(parts) > 1:
+                clean_value = "".join(parts[:-1]).replace(',', '') + "." + parts[-1]
+            else:
+                clean_value = clean_value.replace(',', '')
+
+        # 3. Validasi akhir dengan float
+        float(clean_value)
+        return True
+    except ValueError:
+        return False
 
 def validate_not_only_numeric(value):
     return not str(value).strip().isdigit()
@@ -87,17 +108,22 @@ def run_validation():
     file_customerpersonal = next((f for f in os.listdir(current_dir) if f.lower().startswith('customerpersonal_') and f.endswith('.txt')), None)
 
     if not file_coreaccount or not file_customerpersonal:
-        print("Error: File .txt tidak ditemukan di folder.")
+        print("Error: File .txt coreaccount dan customerpersonal tidak ditemukan di folder.")
         return
 
     print(f"Membaca data...")
     df_a = pd.read_csv(os.path.join(current_dir, file_coreaccount), sep='|', dtype=str)
     df_b = pd.read_csv(os.path.join(current_dir, file_customerpersonal), sep='|', dtype=str)
 
-    # Step 3: Kelengkapan (Filter B yang ada di A)
+    # Convert "YEARLY_INCOME" column to numeric
+    df_b['YEARLY_INCOME'] = pd.to_numeric(df_b['YEARLY_INCOME'], errors='coerce')
+
+    # Step 3: Kelengkapan (Filter data customer personal yang ada di data coreaccount)
     df_b1 = df_b[df_b['CUST_NO'].isin(df_a['CUST_NO'])].copy()
     
-    # Gabungkan dengan info Partner dari File A
+    # Step 4: Validasi    
+
+    # Gabungkan dengan info Partner dari File coreaccount untuk memudahkan identifikasi error per customer
     df_merged = pd.merge(
         df_b1, 
         df_a[['CUST_NO', 'PARTNER_NAME', 'PARTNER_AGRMNT_NO', 'AGRMNT_NO']].drop_duplicates('CUST_NO'), 
@@ -195,7 +221,7 @@ def run_validation():
 
         # 13. Validasi Jabatan
         val_job = str(row['MR_JOB_POSITION'])
-        if not validate_not_blank(val_job) or not validate_not_only_numeric(val_job):
+        if not validate_not_blank(val_job) or not validate_is_numeric(val_job):
             add_to_error('INVALID_MR_JOB_POSITION', row, 'MR_JOB_POSITION', "Blank")
 
         # 14. Validasi Status Perkawinan
@@ -204,9 +230,9 @@ def run_validation():
             add_to_error('INVALID_MARITAL_STAT', row, 'MARITAL_STAT', "Wajib S,M,D")
 
         # 15. Validasi Pendapatan
-        val_income = str(row['TOTAL_INCOME'])
+        val_income = str(row['YEARLY_INCOME'])
         if not validate_not_blank(val_income) or not validate_is_numeric(val_income):
-            add_to_error('INVALID_TOTAL_INCOME', row, 'TOTAL_INCOME', "Harus angka")
+            add_to_error('INVALID_YEARLY_INCOME', row, 'YEARLY_INCOME', "Harus angka")
 
         # 16. Validasi Nama Pasangan
         if val_marital == 'M':

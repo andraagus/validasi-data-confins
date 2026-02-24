@@ -106,7 +106,8 @@ def run_validation():
     
     file_coreaccount = next((f for f in os.listdir(current_dir) if ('coraccount' in f.lower() or 'coreaccount' in f.lower()) and f.endswith('.txt')), None)
     file_customerpersonal = next((f for f in os.listdir(current_dir) if f.lower().startswith('customerpersonal_') and f.endswith('.txt')), None)
-
+    file_customer=next((f for f in os.listdir(current_dir) if f.lower().startswith('customer_') and f.endswith('.txt')), None)
+    
     if not file_coreaccount or not file_customerpersonal:
         print("Error: File .txt coreaccount dan customerpersonal tidak ditemukan di folder.")
         return
@@ -114,6 +115,7 @@ def run_validation():
     print(f"Membaca data...")
     df_a = pd.read_csv(os.path.join(current_dir, file_coreaccount), sep='|', dtype=str)
     df_b = pd.read_csv(os.path.join(current_dir, file_customerpersonal), sep='|', dtype=str)
+    df_c = pd.read_csv(os.path.join(current_dir, file_customer), sep='|', dtype=str)
 
     # Convert "YEARLY_INCOME" column to numeric
     df_b['YEARLY_INCOME'] = pd.to_numeric(df_b['YEARLY_INCOME'], errors='coerce')
@@ -122,10 +124,17 @@ def run_validation():
     df_b1 = df_b[df_b['CUST_NO'].isin(df_a['CUST_NO'])].copy()
     
     # Step 4: Validasi    
-
+    # Gabungkan df_b1 (Personal), df_c (Customer Info - Birth Date), 
+    # dan df_a (Core - Partner Info)
+    df_merged = pd.merge(
+        df_b1, # Data Personal (ID_NO, GENDER)
+        df_c[['CUST_NO', 'BIRTH_DT']], # Ambil BIRTH_DT dari df_c
+        on='CUST_NO', 
+        how='left'
+    )
     # Gabungkan dengan info Partner dari File coreaccount untuk memudahkan identifikasi error per customer
     df_merged = pd.merge(
-        df_b1, 
+        df_merged,
         df_a[['CUST_NO', 'PARTNER_NAME', 'PARTNER_AGRMNT_NO', 'AGRMNT_NO']].drop_duplicates('CUST_NO'), 
         on='CUST_NO', 
         how='left'
@@ -204,10 +213,18 @@ def run_validation():
 
         # 10 validasi ID No
         val_id = str(row['ID_NO'])
+        val_birth_dt = str(row['BIRTH_DT']) # Diambil dari df_c hasil merge
+        val_gender = str(row['MR_GENDER'])
+        # Cek format dasar ID_NO dulu
         if not validate_not_blank(val_id) or not validate_is_numeric(val_id) or not validate_is_exactly_16_digits(val_id):
             add_to_error('INVALID_ID_NO', row, 'ID_NO', "Bukan angka atau tidak 16 digit")
-            add_to_error(validate_relasi_IDNO_BIRTHDATE(val_id, row['BIRTH_DT'], row['MR_GENDER']), row, 'ID_NO', "Relasi ID_NO dengan BIRTH_DT dan GENDER tidak valid")
-
+        
+        # Cek Relasi NIK dengan Tanggal Lahir dan Gender
+        else:
+            # Jika format dasar sudah benar, baru cek relasi isinya
+            is_relation_valid = validate_relasi_IDNO_BIRTHDATE(val_id, val_birth_dt, val_gender)
+            if not is_relation_valid:
+                add_to_error('INVALID_ID_NO', row, 'ID_NO', f"Relasi NIK dengan Birth Date ({val_birth_dt}) atau Gender ({val_gender}) tidak sinkron")
 
          # 11. Validasi Nama ibu kandung
         val_mother = str(row['MOTHER_MAIDEN_NAME'])
@@ -244,6 +261,13 @@ def run_validation():
             val_spouse_id = str(row['SPOUSE_ID_NO'])
             if not validate_not_blank(val_spouse_id) or not validate_is_numeric(val_spouse_id) or not validate_is_exactly_16_digits(val_spouse_id):
                 add_to_error('INVALID_SPOUSE_ID_NO', row, 'SPOUSE_ID_NO', "Bukan angka atau tidak 16 digit")
+
+            # Cek Relasi NIK dengan Tanggal Lahir dan Gender
+            else:
+                # Jika format dasar sudah benar, baru cek relasi isinya
+                is_relation_valid = validate_relasi_IDNO_BIRTHDATE(val_spouse_id, val_birth_dt, val_gender)
+                if not is_relation_valid:
+                    add_to_error('INVALID_SPOUSE_ID_NO', row, 'SPOUSE_ID_NO', f"Relasi NIK dengan Birth Date ({val_birth_dt}) atau Gender ({val_gender}) tidak sinkron")
 
         # 18. Validasi Tanggal Lahir Pasangan
             val_spouse_bd = str(row['SPOUSE_BIRTH_DT'])

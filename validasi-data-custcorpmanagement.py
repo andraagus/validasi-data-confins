@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import re
+from tqdm import tqdm
 
 # ==========================================
 # STEP 1: FUNGSI VALIDASI MODULAR
@@ -110,7 +111,7 @@ def run_validation():
 
     print("Memulai validasi...")
 
-    for _, row in df_merged.iterrows():
+    for _, row in tqdm(df_merged.iterrows(), total=df_merged.shape[0], desc="Validasi Baris", bar_format="{l_bar}{bar:25}{r_bar}", colour='green'):
         # 0. Master Corporate Check
         if pd.isna(row['CUST_NAME']):
             add_to_error('ERR_CUST_NOT_FOUND', row, 'CUST_NO', "CUST_NO tidak ada di master corporate")

@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import re
+from tqdm import tqdm
 
 # ==========================================
 # STEP 1: FUNGSI VALIDASI MODULAR (UNIT)
@@ -85,7 +86,7 @@ def run_validation():
         })
 
     print("Sedang melakukan validasi per baris...")
-    for _, row in df_merged.iterrows():
+    for _, row in tqdm(df_merged.iterrows(), total=df_merged.shape[0], desc="Validasi Baris", bar_format="{l_bar}{bar:25}{r_bar}", colour='green'):
      
         # 2. Validasi Establishment Year
         val_est_year = str(row['ESTABLISHMENT_YEAR'])

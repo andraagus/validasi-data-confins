@@ -24,8 +24,8 @@ def validate_is_decimal(value):
 
 def validate_date_format(value):
     val = str(value).strip()
-    if len(val) == 10 and val[2] == '-' and val[5] == '-':
-        parts = val.split('-')
+    if len(val) == 10 and val[2] == '/' and val[5] == '/':
+        parts = val.split('/')
         return all(p.isdigit() for p in parts)
     return False
 
@@ -79,24 +79,24 @@ def run_validation():
 
     # Inisialisasi Dictionary untuk Sheet yang sangat spesifik
     sheets_data = {
-        'ERR_CUST_NOT_FOUND': [],
-        'ERR_SHAREHOLDER_TYPE': [],
-        'ERR_SEX': [],
-        'ERR_MNGMNT_ADDR': [],
-        'ERR_MNGMNT_RT': [],
-        'ERR_MNGMNT_RW': [],
-        'ERR_MNGMNT_KEL': [],
-        'ERR_MNGMNT_KEC': [],
-        'ERR_MNGMNT_CITY': [],
-        'ERR_MNGMNT_ZIPCODE': [],
-        'ERR_MNGMNT_ID_NO': [],
-        'ERR_MNGMNT_BIRTH_DATE': [],
-        'ERR_MNGMNT_BIRTH_PLACE': [],
-        'ERR_NPWP': [],
-        'ERR_SHARE_PORTION': [],
-        'ERR_JABATAN': [],
-        'ERR_PROVINSI': [],
-        'ERR_ESTABLISHMENT_YEAR': []
+        'INVALID_CUST_NOT_FOUND': [],
+        'INVALID_SHAREHOLDER_TYPE': [],
+        'INVALID_SEX': [],
+        'INVALID_MNGMNT_ADDR': [],
+        'INVALID_MNGMNT_RT': [],
+        'INVALID_MNGMNT_RW': [],
+        'INVALID_MNGMNT_KEL': [],
+        'INVALID_MNGMNT_KEC': [],
+        'INVALID_MNGMNT_CITY': [],
+        'INVALID_MNGMNT_ZIPCODE': [],
+        'INVALID_MNGMNT_ID_NO': [],
+        'INVALID_MNGMNT_BIRTH_DATE': [],
+        'INVALID_MNGMNT_BIRTH_PLACE': [],
+        'INVALID_NPWP': [],
+        'INVALID_SHARE_PORTION': [],
+        'INVALID_JABATAN': [],
+        'INVALID_PROVINSI': [],
+        'INVALID_ESTABLISHMENT_YEAR': []
     }
 
     def add_to_error(sheet, row, col, msg):
@@ -114,28 +114,28 @@ def run_validation():
     for _, row in tqdm(df_merged.iterrows(), total=df_merged.shape[0], desc="Validasi Baris", bar_format="{l_bar}{bar:25}{r_bar}", colour='green'):
         # 0. Master Corporate Check
         if pd.isna(row['CUST_NAME']):
-            add_to_error('ERR_CUST_NOT_FOUND', row, 'CUST_NO', "CUST_NO tidak ada di master corporate")
+            add_to_error('INVALID_CUST_NOT_FOUND', row, 'CUST_NO', "CUST_NO tidak ada di master corporate")
 
         # 1. Shareholder Type (P/C)
         val = get_cell_value(row.get('SHAREHOLDER_TYPE'))
         if validate_not_blank(val) and val.upper() not in ['P', 'C']:
-            add_to_error('ERR_SHAREHOLDER_TYPE', row, 'SHAREHOLDER_TYPE', "Wajib P atau C")
+            add_to_error('INVALID_SHAREHOLDER_TYPE', row, 'SHAREHOLDER_TYPE', "Wajib P atau C")
 
         # 2. Sex (F/M)
         val = get_cell_value(row.get('SEX'))
         if validate_not_blank(val) and val.upper() not in ['F', 'M']:
-            add_to_error('ERR_SEX', row, 'SEX', "Wajib F atau M")
+            add_to_error('INVALID_SEX', row, 'SEX', "Wajib F atau M")
 
         # 3. Alamat & Karakter Khusus (Satu sheet per kolom)
-        for col, sheet in [('MNGMNT_ADDR', 'ERR_MNGMNT_ADDR'), ('MNGMNT_KEL', 'ERR_MNGMNT_KEL'), 
-                           ('MNGMNT_KEC', 'ERR_MNGMNT_KEC'), ('MNGMNT_CITY', 'ERR_MNGMNT_CITY'),
-                           ('MNGMNT_BIRTH_PLACE', 'ERR_MNGMNT_BIRTH_PLACE')]:
+        for col, sheet in [('MNGMNT_ADDR', 'INVALID_MNGMNT_ADDR'), ('MNGMNT_KEL', 'INVALID_MNGMNT_KEL'), 
+                           ('MNGMNT_KEC', 'INVALID_MNGMNT_KEC'), ('MNGMNT_CITY', 'INVALID_MNGMNT_CITY'),
+                           ('MNGMNT_BIRTH_PLACE', 'INVALID_MNGMNT_BIRTH_PLACE')]:
             val = get_cell_value(row.get(col))
             if validate_not_blank(val) and not validate_no_special_chars(val):
                 add_to_error(sheet, row, col, "Terdapat karakter khusus")
 
         # 4. RT & RW
-        for col, sheet in [('MNGMNT_RT', 'ERR_MNGMNT_RT'), ('MNGMNT_RW', 'ERR_MNGMNT_RW')]:
+        for col, sheet in [('MNGMNT_RT', 'INVALID_MNGMNT_RT'), ('MNGMNT_RW', 'INVALID_MNGMNT_RW')]:
             val = get_cell_value(row.get(col))
             if validate_not_blank(val) and (not val.isdigit() or len(val) > 3):
                 add_to_error(sheet, row, col, "Harus angka & maks 3 digit")
@@ -143,7 +143,7 @@ def run_validation():
         # 5. Zipcode
         val = get_cell_value(row.get('MNGMNT_ZIPCODE'))
         if validate_not_blank(val) and (not val.isdigit() or len(val) != 5):
-            add_to_error('ERR_MNGMNT_ZIPCODE', row, 'MNGMNT_ZIPCODE', "Harus 5 digit angka")
+            add_to_error('INVALID_MNGMNT_ZIPCODE', row, 'MNGMNT_ZIPCODE', "Harus 5 digit angka")
 
         # 6. ID No (Relasi NIK)
         id_no = get_cell_value(row.get('ID_NO'))
@@ -152,42 +152,42 @@ def run_validation():
         sex = get_cell_value(row.get('SEX'))
         if validate_not_blank(id_no):
             if not validate_no_special_chars(id_no):
-                add_to_error('ERR_MNGMNT_ID_NO', row, 'ID_NO', "Ada karakter khusus")
+                add_to_error('INVALID_MNGMNT_ID_NO', row, 'ID_NO', "Ada karakter khusus")
             elif len(id_no) == 16 and id_type in ['NIK', 'KTP', 'ID NO']:
                 if not validate_relasi_IDNO_BIRTHDATE(id_no, b_date, sex):
-                    add_to_error('ERR_MNGMNT_ID_NO', row, 'ID_NO', f"NIK tidak sinkron dengan Birth Date ({b_date})")
+                    add_to_error('INVALID_MNGMNT_ID_NO', row, 'ID_NO', f"NIK tidak sinkron dengan Birth Date ({b_date})")
 
         # 7. Birth Date
         if validate_not_blank(b_date) and not validate_date_format(b_date):
-            add_to_error('ERR_MNGMNT_BIRTH_DATE', row, 'BIRTH_DT', "Format wajib DD-MM-YYYY")
+            add_to_error('INVALID_MNGMNT_BIRTH_DATE', row, 'BIRTH_DT', "Format wajib DD-MM-YYYY")
 
         # 7.b. Birth Place (Karakter Khusus)
         val = get_cell_value(row.get('BIRTH_PLACE'))
         if validate_not_blank(val) and not validate_no_special_chars(val):
-            add_to_error('ERR_MNGMNT_BIRTH_PLACE', row, 'BIRTH_PLACE', "Terdapat karakter khusus")
+            add_to_error('INVALID_MNGMNT_BIRTH_PLACE', row, 'BIRTH_PLACE', "Terdapat karakter khusus")
 
         # 8. NPWP
         val = get_cell_value(row.get('NPWP_NO'))
         if validate_not_blank(val) and (not val.isdigit() or len(val) != 16):
-            add_to_error('ERR_NPWP', row, 'NPWP_NO', "Wajib 16 digit angka")
+            add_to_error('INVALID_NPWP', row, 'NPWP_NO', "Wajib 16 digit angka")
 
         # 9. Share Portion
         val = get_cell_value(row.get('SHARE_PORTION'))
         if validate_not_blank(val) and not validate_is_decimal(val):
-            add_to_error('ERR_SHARE_PORTION', row, 'SHARE_PORTION', "Harus format angka/desimal")
+            add_to_error('INVALID_SHARE_PORTION', row, 'SHARE_PORTION', "Harus format angka/desimal")
 
         # 10. Jabatan, Provinsi, Est Year
-        for col, sheet in [('JABATAN', 'ERR_JABATAN'), ('PROVINSI', 'ERR_PROVINSI')]:
+        for col, sheet in [('JABATAN', 'INVALID_JABATAN'), ('PROVINSI', 'INVALID_PROVINSI')]:
             val = get_cell_value(row.get(col))
             if validate_not_blank(val) and not val.isdigit():
                 add_to_error(sheet, row, col, "Harus kode angka")
 
         val = get_cell_value(row.get('ESTABLISHMENT_YEAR'))
         if validate_not_blank(val) and (not val.isdigit() or len(val) != 4):
-            add_to_error('ERR_ESTABLISHMENT_YEAR', row, 'ESTABLISHMENT_YEAR', "Harus 4 digit tahun")
+            add_to_error('INVALID_ESTABLISHMENT_YEAR', row, 'ESTABLISHMENT_YEAR', "Harus 4 digit tahun")
 
     # --- SIMPAN KE EXCEL ---
-    output_path = os.path.join(current_dir, 'DETAIL_ERROR_PER_KOLOM.xlsx')
+    output_path = os.path.join(current_dir, 'DATA_CUSTOMERMANAGEMENT_TIDAK_VALID.xlsx')
     valid_sheets = {name: data for name, data in sheets_data.items() if data}
 
     if valid_sheets:
